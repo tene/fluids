@@ -7,5 +7,5 @@ use lib qw/lib/;
 
 use LB::Grid;
 
-my $x = LB::Grid->new(2,9,8,8);
+my $x = LB::Grid->new(2,9,16,8);
 say $x->dump;

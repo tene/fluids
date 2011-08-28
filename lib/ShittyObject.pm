@@ -10,13 +10,13 @@ sub attr {
     my ($name) = @_;
     my ($caller) = caller;
     no strict 'refs';
-    *{"${caller}::$name"} = sub {
+    *{"${caller}::$name"} = sub :lvalue {
         my ($self, $val) = @_;
 
         if (defined($val)) {
             $self->{$name} = $val;
         }
-        return $self->{$name};
+        $self->{$name};
     }
 }
 
