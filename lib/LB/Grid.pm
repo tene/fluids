@@ -3,30 +3,23 @@ use strict;
 use warnings;
 use v5.12;
 use feature ':5.12';
-use ShittyObject qw/attr/;
+use Carp qw/confess/;
 use List::Util qw/sum/;
 use List::MoreUtils qw//;
 
-attr($_) for qw/x y dimensions count weight vel o/;
-
-sub u :lvalue {
-    my ($self, $x, $y) = @_;
-    $self->{'u'}[$x][$y];
+for my $name (qw/x y dimensions count weight vel o/) {
+    no strict 'refs';
+    *{__PACKAGE__."::$name"} = sub :lvalue {
+        $_[0]{$name};
+    }
 }
 
-sub v :lvalue {
-    my ($self, $x, $y) = @_;
-    $self->{'v'}[$x][$y];
-}
-
-sub flags :lvalue {
-    my ($self, $x, $y) = @_;
-    $self->{'flags'}[$x][$y];
-}
-
-sub mass :lvalue {
-    my ($self, $x, $y) = @_;
-    $self->{'mass'}[$x][$y];
+for my $name (qw/u v flags mass/) {
+    no strict 'refs';
+    *{__PACKAGE__."::$name"} = sub :lvalue {
+        confess "Accessor $name requires x and y arguments" unless @_ == 3;
+        $_[0]{$name}[$_[1]][$_[2]];
+    }
 }
 
 sub new {
