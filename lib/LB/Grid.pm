@@ -39,8 +39,21 @@ sub new {
         for my $y (0..$obj->y) {
             $obj->u($x,$y)     = [(0) x $obj->count];
             $obj->v($x,$y)     = [(0) x $obj->count];
-            $obj->flags($x,$y) = 0;
-            $obj->mass($x,$y)  = $x/$obj->x;
+            if ($x > $y) {
+                $obj->flags($x,$y) = 'empty';
+                $obj->mass($x,$y)  = 0;
+            }
+            elsif ($x == $y) {
+                $obj->flags($x,$y) = 'interface';
+                $obj->mass($x,$y)  = 0.5;
+            }
+            elsif ($x < $y) {
+                $obj->flags($x,$y) = 'fluid';
+                $obj->mass($x,$y)  = 1;
+            }
+            else {
+                confess "wtf";
+            }
         }
     }
     return $obj;
