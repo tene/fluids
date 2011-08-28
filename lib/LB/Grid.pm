@@ -39,7 +39,11 @@ sub new {
         for my $y (0..$obj->y) {
             $obj->u($x,$y)     = [(0) x $obj->count];
             $obj->v($x,$y)     = [(0) x $obj->count];
-            if ($x > $y) {
+            if ($x == 0 or $x == $obj->x or $y == 0 or $y == $obj->y) {
+                $obj->flags($x,$y) = 'boundary';
+                $obj->mass($x,$y)  = 0;
+            }
+            elsif ($x > $y) {
                 $obj->flags($x,$y) = 'empty';
                 $obj->mass($x,$y)  = 0;
             }
@@ -65,8 +69,15 @@ sub dump {
     my $dump = '';
     for my $y (0..$self->y) {
         for my $x (0..$self->x) {
-            my $m = $self->mass($x,$y);
-            $dump .= $blocks[int($m * (@blocks-1))];
+            given ($self->flags($x,$y)) {
+                when ('boundary') {
+                    $dump .= '▒';
+                }
+                default {
+                    my $m = $self->mass($x,$y);
+                    $dump .= $blocks[int($m * (@blocks-1))];
+                }
+            }
         }
         $dump .= "\n";
     }
