@@ -12,7 +12,7 @@ local $SIG{__DIE__} = sub {
     confess "Uncaught exception: @_" unless $^S;
 };
 
-my $count = $ARGV[0] // 10;
+my $count = $ARGV[0] // 5000;
 
 my $x = LB::Grid->new(2,9,14,16);
 say $x->dump;
