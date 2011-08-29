@@ -89,7 +89,7 @@ sub boundary {
     return 1 if $x >= 6 && $y == $my-7;
     return 1 if $x == 0 or $x == $mx-1 or $y == 0 or $y == $my-1;
     return 1 if ($x == 6) and $y < $my - 3 and $y >= $my-7;
-    return 1 if $x == 9 and $y > $my - 5;
+    return 1 if $x == 9 and $y > $my - 4;
 }
 
 sub liquid {
@@ -369,7 +369,8 @@ sub swap {
 }
 
 sub dump {
-    my @blocks = (' ', qw/▁ ▂ ▃ ▄ ▅ ▆ ▇ █/);
+    #my @blocks = (' ', qw/▁ ▂ ▃ ▄ ▅ ▆ ▇ █/);
+    my @shades = (232..255);
     my $self = shift;
     my $dump = '';
     my $mass = 0;
@@ -378,15 +379,18 @@ sub dump {
             $mass += $self->mass($x, $y);
             given ($self->flags($x,$y)) {
                 when ('boundary') {
-                    $dump .= '▒';
+                    $dump .= '▒▒';
                 }
                 when ('empty') {
-                    $dump .= ' ';
+                    $dump .= '  ';
                 }
                 default {
                     #my $m = pressure($self->grid($x,$y));
                     my $m = $self->mass($x, $y);
-                    $dump .= $blocks[int($m * (@blocks-1))] // do { say "ρ($x,$y)=$m"; '?'};
+                    #$dump .= $blocks[int($m * (@blocks-1))] // do { say "ρ($x,$y)=$m"; '?'};
+                    $m = $m ** 2;
+                    my $shade = $shades[int($m*(@shades-1))] // $shades[-1];
+                    $dump .= "\e[38;5;${shade}m██\e[0m";
                 }
             }
         }
