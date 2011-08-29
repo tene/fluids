@@ -7,8 +7,6 @@ use Carp qw/confess croak/;
 use List::Util qw/sum/;
 use List::MoreUtils qw/pairwise/;
 
-use Data::Dump qw/ddx pp/;
-
 my $DEBUG = $ENV{'DEBUG'};
 
 sub debug {

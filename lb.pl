@@ -6,7 +6,6 @@ use feature ':5.12';
 use lib qw/lib/;
 
 use LB::Grid;
-use Data::Dump;
 use Carp qw/croak confess/;
 
 local $SIG{__DIE__} = sub {
