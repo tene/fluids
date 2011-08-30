@@ -109,7 +109,7 @@ sub new {
         weight     => [ 4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36 ],
         e          => [ [ 0,0 ], [ 1,0 ], [ 0,1 ], [ -1,0 ], [ 0,-1 ], [ 1,1 ], [ -1,1 ], [ -1,-1 ], [ 1,-1 ] ],
         o          => [0, 3, 4, 1, 2, 7, 8, 5, 6],
-        omega      => 0.65,
+        omega      => 0.85,
         filled     => [],
         emptied    => [],
     };
@@ -135,7 +135,7 @@ sub new {
     }
     for my $x (0..$obj->x) {
         for my $y (0..$obj->y) {
-            if ($obj->flags($x, $y) eq 'full' and grep { $obj->flags(@$_) ~~ ['boundary','empty']} @{$obj->neigh($x, $y)}) {
+            if ($obj->flags($x, $y) eq 'full' and grep { $obj->flags(@$_) ~~ ['empty']} @{$obj->neigh($x, $y)}) {
                 $obj->flags($x,$y) = 'interface';
                 $obj->mass($x,$y)  = 0.5;
                 $obj->grid($x,$y)  = $obj->eq([0,0.02], 1);
@@ -166,11 +166,11 @@ sub stream {
                     if ($self->flags($x, $y) eq 'interface') {
                         my $m = $self->mass($x, $y);
                         if ($m > 1.001) {
-                            debug "Filled $x, $y";
+                            debug "Noticed $x,$y is full";
                             push @{$self->filled}, [$x, $y];
                         }
                         elsif ($m < -0.001) {
-                            debug "Emptied $x, $y";
+                            debug "Noticed $x,$y is empty";
                             push @{$self->emptied}, [$x, $y];
                         }
                     }
@@ -187,6 +187,7 @@ sub stream {
             my ($nx, $ny) = @$_;
             given ($self->flags($nx, $ny)) {
                 when ('empty') {
+                    debug("Converting $nx, $ny from empty to interface");
                     $self->emptytointerface($nx, $ny);
                 }
                 when ('interface') {
@@ -205,6 +206,7 @@ sub stream {
             my ($nx, $ny) = @$_;
             given ($self->flags($nx, $ny)) {
                 when ('full') {
+                    debug("Converting $nx, $ny from full to interface");
                     $self->fulltointerface($nx, $ny);
                 }
             }
@@ -224,7 +226,9 @@ sub distributemass {
     my @neigh =  @{$self->neigh($x, $y)};
     @neigh = grep { $self->flags(@$_) eq 'interface' } @neigh;
     my $count = @neigh;
-    die "distributing mass without adjacent interface cells?  wtf?" if $count == 0;
+    if ($count == 0) {
+        debug( "Could not distribute mass from $x,$y; no interface neighbors");
+    }
     my $m;
     given ($self->flags($x, $y)) {
         when ('full') {
@@ -265,7 +269,6 @@ sub emptytointerface {
         }
     }
     if ($count > 0) {
-        debug("Converting $x,$y from empty to interface");
         $p /= $count;
         @u = map { $_ / $count } @u;
         $self->grid($x, $y) = $self->eq([@u], $p);
@@ -273,7 +276,8 @@ sub emptytointerface {
         $self->mass($x, $y) = 0;
     }
     else {
-        croak "Initializing an empty cell with no filled or interface neighbors?  wtf?";
+        #croak "Initializing an empty cell with no filled or interface neighbors?  wtf?";
+        debug( "Could not convert $x,$y to interface; no interface neighbors" );
     }
 }
 
@@ -284,10 +288,15 @@ sub fulltointerface {
 }
 
 sub neigh {
-    my ($self, $x, $y, $bl) = @_;
+    my ($self, $x, $y) = @_;
     my @coords = map { [$x + $_->[0], $y + $_->[1]] } @{$self->e};
     shift @coords;
     return [@coords];
+}
+
+sub neighflagcount {
+    my ($self, $x, $y, $flag) = @_;
+    return 0 + map { $self->flags(@$_) eq $flag } @{$self->neigh($x, $y)};
 }
 
 sub in {
@@ -316,6 +325,13 @@ sub gather {
     my $eq;
 
     my $mass = 0;
+    my $normal;
+    # empty neighbors and full neighbors
+    my ($neighempty, $neighfull);
+    if ($flags eq 'interface') {
+        $normal = $self->normal($x, $y);
+        ($neighempty, $neighfull) = map { $self->neighflagcount($x, $y, $_) > 0 } qw/empty full/;
+    }
     for my $i (0..($self->count-1)) {
         my ($dx, $dy) = @{$e[$i]};
         my $o = $o[$i];
@@ -325,11 +341,33 @@ sub gather {
             }
             when (['full', 'interface']) {
                 $fp[$o] = $self->in($x, $y, $i);
-                my $mul = 1;
-                if ($_ eq 'interface' and $flags eq 'interface') {
-                    $mul = ($self->ff($x, $y) + $self->ff($x+$dx, $y+$dy))/2;
+                if ($flags eq 'interface') {
+                    my $mul = 1;
+                    my $dm = 0;
+                    if ($_ eq 'interface' ) {
+                        $mul = ($self->ff($x, $y) + $self->ff($x+$dx, $y+$dy))/2;
+                        my ($ineighempty, $ineighfull) = map { $self->neighflagcount($x+$dx, $y+$dy, $_) > 0 } qw/empty full/;
+                        my ($tmp, $itmp) = ("$neighempty,$neighfull", "$ineighempty,$ineighfull");
+                        if ($tmp eq $itmp or !$ineighfull or !$neighempty) {
+                            $dm += $fp[$o];
+                        }
+                        if ($tmp eq $itmp or !$ineighempty or !$neighfull) {
+                            $dm -= $f->[$i];
+                        }
+                    }
+                    else {
+                        $dm = ($fp[$o] - $f->[$i]);
+                    }
+                    $mass += $mul * $dm;
+                    if (dot($normal, $self->e->[$o]) > 0) {
+                        $u //= $self->u($f);
+                        $eq //= $self->eq($u, 1);
+                        $fp[$o] = $eq->[$i] + $eq->[$o] - $f->[$i];
+                    }
                 }
-                $mass += $mul * ($fp[$o] - $f->[$i]);
+                else {
+                    $mass += ($fp[$o] - $f->[$i]);
+                }
             }
             when ('empty') {
                 $u //= $self->u($f);
@@ -359,6 +397,13 @@ sub ff {
     }
 }
 
+sub normal {
+    my ($self, $x, $y) = @_;
+    my $nx = ($self->ff($x-1, $y) - $self->ff($x+1, $y))/2;
+    my $ny = ($self->ff($x, $y-1) - $self->ff($x, $y+1))/2;
+    return [$nx,$ny];
+}
+
 sub swap {
     my ($self) = @_;
     my $tmp = $self->{'grid'};
@@ -370,35 +415,39 @@ sub dump {
     #my @blocks = (' ', qw/▁ ▂ ▃ ▄ ▅ ▆ ▇ █/);
     my @shades = (232..255);
     my $self = shift;
-    my $dump = '';
+    my @dump;
     my $mass = 0;
     for my $y (0..$self->y) {
+        my @line;
         for my $x (0..$self->x) {
             $mass += $self->mass($x, $y);
             given ($self->flags($x,$y)) {
                 when ('boundary') {
-                    $dump .= '▒▒';
+                    #$dump .= '▒▒';
+                    push @line, 'boundary';
                 }
                 when ('empty') {
-                    $dump .= '  ';
+                    #$dump .= '  ';
+                    push @line, 'empty';
                 }
                 default {
                     #my $m = pressure($self->grid($x,$y));
                     my $m = $self->mass($x, $y);
                     #$dump .= $blocks[int($m * (@blocks-1))] // do { say "ρ($x,$y)=$m"; '?'};
-                    $m = $m ** 2;
-                    my $shade = $shades[int($m*(@shades-1))] // $shades[-1];
-                    $dump .= "\e[38;5;${shade}m██\e[0m";
+                    #$m = $m ** 2;
+                    #my $shade = $shades[int($m*(@shades-1))] // $shades[-1];
+                    #$line .= "\e[38;5;${shade}m██\e[0m";
+                    push @line, $m;
                 }
             }
         }
-        $dump .= "\n";
+        push @dump, [@line];
     }
     #$dump .= "mass=$mass\n";
     #my ($u, $p, $m, $f) = ($self->u($self->grid(1,2)), pressure($self->grid(1,2)), $self->mass(1,2), $self->flags(1,2));
     #my ($x, $y) = @$u;
     #$dump .= "1,2 = $f u($x,$y) ρ($p) m($m)\n";
-    return $dump;
+    return @dump;
 }
 
 1;
