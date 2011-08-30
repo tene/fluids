@@ -60,7 +60,7 @@ sub draw {
 my $count = $ARGV[0] // 5000;
 my $drawstep = $ARGV[1] // 1;
 
-my $x = LB::Grid->new(2,9,14,20);
+my $lb = LB::Grid->new(2,9,20,25);
 
 sub render {
     my (@grid) = @_;
@@ -76,13 +76,27 @@ sub render {
 }
 
 for (1..$count) {
-    $x->stream;
+    spout() if $_ < 300;
+    $lb->stream;
     if (($_ % $drawstep) == 0) {
         clear;
-        render($x->dump);
+        render($lb->dump);
         doupdate();
         refresh;
     }
+}
+
+sub spout {
+    for my $x (2..4) {
+        for my $y (2..4) {
+            $lb->grid($x,$y) = $lb->eq([0.2,0], 1);
+            $lb->mass($x,$y) = 1;
+            $lb->flags($x,$y) = 'interface' if $lb->flags($x,$y) eq 'empty';
+        }
+    }
+     $lb->grid(3,3) = $lb->eq([0.30,0], 1);
+     $lb->mass(3,3) = 1;
+    $lb->flags(3,3) = 'full';
 }
 
 endwin;

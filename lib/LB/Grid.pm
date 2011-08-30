@@ -15,7 +15,7 @@ sub debug {
     }
 }
 
-for my $name (qw/x y dimensions count weight e o omega filled emptied/) {
+for my $name (qw/x y dimensions count weight e o omega filled emptied g/) {
     no strict 'refs';
     *{__PACKAGE__."::$name"} = sub :lvalue {
         $_[0]{$name};
@@ -83,14 +83,20 @@ sub dot {
 
 sub boundary {
     my ($x, $y, $mx, $my) = @_;
-    return 1 if $x < 4 && $y > $my-5;
-    return 1 if $x >= 6 && $y == $my-7;
+
+    # walls
     return 1 if $x == 0 or $x == $mx-1 or $y == 0 or $y == $my-1;
-    return 1 if ($x == 6) and $y < $my - 3 and $y >= $my-7;
-    return 1 if $x == 9 and $y > $my - 4;
+
+    # corner brick
+    return 1 if $x < 4 && $y > $my-7;
+
+    return 1 if $x >= 8 && $y == $my-11;
+    return 1 if ($x == 8) and $y < $my - 5 and $y >= $my-11;
+    return 1 if $x == 13 and $y > $my - 7;
 }
 
 sub liquid {
+    return 0;
     my ($x, $y, $mx, $my) = @_;
     return 1 if $x < 6;
 }
@@ -109,7 +115,8 @@ sub new {
         weight     => [ 4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36 ],
         e          => [ [ 0,0 ], [ 1,0 ], [ 0,1 ], [ -1,0 ], [ 0,-1 ], [ 1,1 ], [ -1,1 ], [ -1,-1 ], [ 1,-1 ] ],
         o          => [0, 3, 4, 1, 2, 7, 8, 5, 6],
-        omega      => 0.85,
+        omega      => 1.8,
+        g          => 0.001,
         filled     => [],
         emptied    => [],
     };
@@ -125,7 +132,7 @@ sub new {
             elsif (liquid($x, $y, $mx, $my)) {
                 $obj->flags($x,$y) = 'full';
                 $obj->mass($x,$y)  = 1;
-                $obj->grid($x,$y)  = $obj->eq([0,0.02], 1);
+                $obj->grid($x,$y)  = $obj->eq([0.15,0.00], 1);
             }
             else {
                 $obj->flags($x,$y) = 'empty';
@@ -147,6 +154,7 @@ sub new {
 
 sub stream {
     my ($self) = @_;
+    debug("step");
     for my $y (0..$self->y) {
         for my $x (0..$self->x) {
             given ($self->flags($x,$y)) {
@@ -157,7 +165,7 @@ sub stream {
                     my ($f, $m)  = $self->gather($x,$y);
                     $self->mass($x, $y) += $m;
                     my $u = $self->u($f);
-                    $u->[1] += 0.01;
+                    $u->[1] += $self->g;
                     my $p = pressure($f);
                     my $eq = $self->eq($u, $p);
                     my $w = $self->omega;
@@ -172,6 +180,18 @@ sub stream {
                         elsif ($m < -0.001) {
                             debug "Noticed $x,$y is empty";
                             push @{$self->emptied}, [$x, $y];
+                        }
+                        elsif ($self->neighflagcount($x, $y, 'fluid') == 0) {
+                            if ($m > 0.5 or $self->neighflagcount($x, $y, 'interface') > 0) {
+                                debug "Noticed lost interface $x,$y; faking full";
+                                #$self->mass($x,$y) = 1.01;
+                                push @{$self->filled}, [$x, $y];
+                            }
+                            elsif ($m < 0.5) {
+                                debug "Noticed lost interface $x,$y; faking empty";
+                                #$self->mass($x,$y) = 1.01;
+                                push @{$self->emptied}, [$x, $y];
+                            }
                         }
                     }
                 }
@@ -214,6 +234,7 @@ sub stream {
         $self->flags($x, $y) = 'empty';
     }
     for (@{$self->filled}, @{$self->emptied}) {
+        debug('Distributing mass for '.join(',', @$_));
         $self->distributemass(@$_);
     }
 
@@ -254,12 +275,11 @@ sub distributemass {
     }
     for (@neigh) {
         my $val = pop @$_;
-        if ($total > 0) {
-            $self->mass(@$_) += $m * $val / $total;
-        }
-        else {
-            $self->mass(@$_) += $m/$count;
-        }
+        my $dm = $total > 0 ? $m * $val / $total : $m/$count;
+
+        debug("Adding $dm to ".join(',',@$_));
+
+        $self->mass(@$_) += $dm;
     }
 }
 
@@ -404,7 +424,14 @@ sub ff {
             return $self->mass($x, $y);
         }
         when ('full') {
-            return $self->mass($x, $y) / pressure($self->grid($x, $y));
+            return 1;
+            my $pressure = pressure($self->grid($x, $y));
+            if ($pressure > 0) {
+                return $self->mass($x, $y) / $pressure;
+            }
+            else {
+                die "Tried to calculate fluid fraction of full cell $x,$y with zero pressure";
+            }
         }
         default {
             return 0;
@@ -449,7 +476,7 @@ sub dump {
                     #my $m = pressure($self->grid($x,$y));
                     my $m = $self->mass($x, $y);
                     #$dump .= $blocks[int($m * (@blocks-1))] // do { say "ρ($x,$y)=$m"; '?'};
-                    #$m = $m ** 2;
+                    $m = $m ** 2;
                     #my $shade = $shades[int($m*(@shades-1))] // $shades[-1];
                     #$line .= "\e[38;5;${shade}m██\e[0m";
                     push @line, $m;
