@@ -230,6 +230,7 @@ sub distributemass {
         debug( "Could not distribute mass from $x,$y; no interface neighbors");
     }
     my $m;
+    my $normal = $self->normal($x, $y);
     given ($self->flags($x, $y)) {
         when ('full') {
             $m = $self->mass($x, $y) - pressure($self->grid($x, $y));
@@ -243,8 +244,22 @@ sub distributemass {
             confess "distributing mass from interface or boundary cell?  wtf?";
         }
     }
+    my $total;
     for (@neigh) {
-        $self->mass(@$_) += $m/$count;
+        my $dot = dot($normal, [$x-$_->[0], $y-$_->[1]]);
+        $dot *= -1 if $self->flags($x, $y) eq 'empty';
+        my $val = $dot > 0 ? $dot : 0;
+        $total += $val;
+        push @$_, $val;
+    }
+    for (@neigh) {
+        my $val = pop @$_;
+        if ($total > 0) {
+            $self->mass(@$_) += $m * $val / $total;
+        }
+        else {
+            $self->mass(@$_) += $m/$count;
+        }
     }
 }
 
