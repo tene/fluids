@@ -476,7 +476,7 @@ sub dump {
                     #my $m = pressure($self->grid($x,$y));
                     my $m = $self->mass($x, $y);
                     #$dump .= $blocks[int($m * (@blocks-1))] // do { say "ρ($x,$y)=$m"; '?'};
-                    $m = $m ** 2;
+                    $m = $m ** 1.8;
                     #my $shade = $shades[int($m*(@shades-1))] // $shades[-1];
                     #$line .= "\e[38;5;${shade}m██\e[0m";
                     push @line, $m;
