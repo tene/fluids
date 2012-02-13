@@ -1,0 +1,5 @@
+npraises
+.*.sw?
+*.o
+*.a
+test
