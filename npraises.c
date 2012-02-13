@@ -46,6 +46,8 @@ int setup_screen() {
     }
     term_settings = my_settings;
     cfmakeraw(&my_settings);
+    my_settings.c_cc[VMIN] = 0;
+    my_settings.c_cc[VTIME] = 0;
     rv = tcsetattr (0, TCSANOW, &my_settings);
     if (rv < 0) {
         perror ("error in tcsetattr");
