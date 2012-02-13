@@ -1,4 +1,7 @@
 #include <npraises.h>
+#include <termios.h>
+#define _BSD_SOURCE
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,18 +28,44 @@ uint8_t gray_f(float v) {
 }
 
 void set_fg(uint8_t c) {
-    printf("\e[38;5;%um", c);
+    putp(tiparm(set_a_foreground, c));
 }
 
 void set_bg(uint8_t c) {
-    printf("\e[48;5;%um", c);
+    putp(tiparm(set_a_background, c));
 }
 
-void reset_colors() {
-    printf("\e[0m");
-}
-
-void setup_screen() {
-    setupterm( (char*)0, 1, (int*)0 );
+struct termios term_settings;
+int setup_screen() {
+    int rv;
+    struct termios my_settings;
+    rv = tcgetattr (0, &my_settings);
+    if (rv < 0) {
+        perror ("error in tcgetattr");
+        return 0;
+    }
+    term_settings = my_settings;
+    cfmakeraw(&my_settings);
+    rv = tcsetattr (0, TCSANOW, &my_settings);
+    if (rv < 0) {
+        perror ("error in tcsetattr");
+        return 0;
+    }
+    setupterm( "xterm-256color", 1, (int*)0 );
     putp(clear_screen);
-};
+    putp(enter_ca_mode);
+    putp(orig_pair);
+    putp(cursor_invisible);
+    return 1;
+}
+
+void cleanup_screen() {
+    putp(orig_pair);
+    putp(exit_ca_mode);
+    putp(cursor_normal);
+    tcsetattr (0, TCSANOW, &term_settings);
+}
+
+void curs_xy(uint8_t x, uint8_t y) {
+    putp(tiparm(tigetstr("cup"), y, x));
+}

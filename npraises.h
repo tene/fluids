@@ -1,6 +1,8 @@
 #ifndef NPRAISES_H_INCLUDED
 #define NPRAISES_H_INCLUDED
 
+#define _BSD_SOURCE
+#include <unistd.h>
 #include <stdint.h>
 #include <term.h>
 
@@ -12,8 +14,10 @@ void set_fg(uint8_t c);
 
 void set_bg(uint8_t c);
 
-void reset_colors();
+int setup_screen();
 
-void setup_screen();
+void cleanup_screen();
+
+void curs_xy(uint8_t x, uint8_t y);
 
 #endif
