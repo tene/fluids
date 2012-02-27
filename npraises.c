@@ -35,7 +35,8 @@ void set_bg(uint8_t c) {
     putp(tiparm(set_a_background, c));
 }
 
-struct termios term_settings;
+static struct termios term_settings;
+
 int setup_screen() {
     int rv;
     struct termios my_settings;

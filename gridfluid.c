@@ -11,6 +11,7 @@ struct gridfluid {
     uint8_t y;
     float gravity;
     gridfluid_cell_t *grid;
+    gridfluid_cell_t *nextgrid;
 };
 
 #define GF_CELL(gf,cx,cy) (gf->grid[cx + cy*gf->x])
@@ -18,6 +19,7 @@ struct gridfluid {
 gridfluid_t gridfluid_create_empty_scene(uint8_t x, uint8_t y) {
     gridfluid_t gf = calloc(1, sizeof(struct gridfluid));
     gf->grid = calloc(x*y, sizeof(gridfluid_cell_t));
+    gf->nextgrid = calloc(x*y, sizeof(gridfluid_cell_t));
     for (uint8_t i = 1; i < x-1; i++) {
         for (uint8_t j = 1; j < y-1; j++) {
             gridfluid_set_empty(gf, i, j);

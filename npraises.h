@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <term.h>
 
+#pragma GCC visibility push(default)
+
 uint8_t rgb_f(float r, float g, float b);
 
 uint8_t gray_f(float v);
@@ -19,5 +21,7 @@ int setup_screen();
 void cleanup_screen();
 
 void curs_xy(uint8_t x, uint8_t y);
+
+#pragma GCC visibility pop
 
 #endif
