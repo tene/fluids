@@ -3,14 +3,18 @@
 
 #include <stdint.h>
 
-typedef struct gridfluid {
-    uint8_t x;
-    uint8_t y;
-    uint8_t *flags;
-    float *field;
-} *gridfluid_t;
+typedef enum e_gridfluid_state {
+    GF_BOUNDARY,
+    GF_EMPTY,
+    GF_FLUID,
+    GF_INTERFACE
+} gridfluid_state;
+
+typedef struct gridfluid *gridfluid_t;
 
 gridfluid_t gridfluid_create_empty_scene(uint8_t x, uint8_t y);
+
+void gridfluid_free(gridfluid_t gf);
 
 void gridfluid_set_boundary(gridfluid_t gf, uint8_t x, uint8_t y);
 void gridfluid_set_fluid(gridfluid_t gf, uint8_t x, uint8_t y);

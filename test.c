@@ -1,8 +1,15 @@
+#include "npraises.h"
+#include "gridfluid.h"
 #include <stdio.h>
-#include <npraises.h>
 #include <unistd.h>
+#include <assert.h>
 
 int main() {
+    gridfluid_t gf = gridfluid_create_empty_scene(40,20);
+    gridfluid_set_boundary(gf,5,7);
+    gridfluid_set_fluid(gf,10,10);
+    gridfluid_set_gravity(gf,1.0f);
+    assert(gridfluid_get_type(gf,5,7) == GF_BOUNDARY);
     if (!setup_screen()) {
         printf("Failed to setup screen; exiting\n");
         return(1);
@@ -40,5 +47,6 @@ int main() {
         }
     }
     cleanup_screen();
+    gridfluid_free(gf);
     return 0;
 }
