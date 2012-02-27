@@ -14,6 +14,19 @@ struct gridfluid {
     gridfluid_cell_t *nextgrid;
 };
 
+static const float weights[9] = { 4./9., 1./9., 1./9., 1./9., 1./9.,
+                             1./36., 1./36., 1./36., 1./36. };
+
+static const float velocities[9][2] = {
+    {0,0},
+    {1,0}, {0,1}, {-1,0}, {0,-1},
+    {1,1}, {-1,1}, {-1,-1}, {1,-1}
+};
+
+static const uint8_t rindex[9] = {
+    0,3,4,1,2,7,8,5,6
+};
+
 #define GF_CELL(gf,cx,cy) (gf->grid[cx + cy*gf->x])
 
 gridfluid_t gridfluid_create_empty_scene(uint8_t x, uint8_t y) {
@@ -52,4 +65,8 @@ void gridfluid_set_gravity(gridfluid_t gf, float g) {
 
 uint8_t gridfluid_get_type(gridfluid_t gf, uint8_t x, uint8_t y) {
     return( GF_CELL(gf,x,y).flags );
+}
+
+void gridfluid_step(gridfluid_t gf) {
+    abort();
 }

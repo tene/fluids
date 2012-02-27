@@ -24,6 +24,8 @@ void gridfluid_set_empty(gridfluid_t gf, uint8_t x, uint8_t y);
 void gridfluid_set_gravity(gridfluid_t gf, float g);
 uint8_t gridfluid_get_type(gridfluid_t gf, uint8_t x, uint8_t y);
 
+void gridfluid_step(gridfluid_t gf);
+
 #pragma GCC visibility pop
 
 #endif
