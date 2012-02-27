@@ -6,10 +6,10 @@
 
 int main() {
     gridfluid_t gf = gridfluid_create_empty_scene(40,20);
-    gridfluid_set_boundary(gf,5,7);
+    gridfluid_set_obstacle(gf,5,7);
     gridfluid_set_fluid(gf,10,10);
     gridfluid_set_gravity(gf,1.0f);
-    assert(gridfluid_get_type(gf,5,7) == GF_BOUNDARY);
+    assert(gridfluid_get_type(gf,5,7) == GF_OBSTACLE);
     if (!setup_screen()) {
         printf("Failed to setup screen; exiting\n");
         return(1);

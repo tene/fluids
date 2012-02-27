@@ -46,8 +46,8 @@ void gridfluid_free(gridfluid_t gf) {
     free(gf);
 }
 
-void gridfluid_set_boundary(gridfluid_t gf, uint8_t x, uint8_t y) {
-    GF_CELL(gf,x,y).flags = GF_BOUNDARY;
+void gridfluid_set_obstacle(gridfluid_t gf, uint8_t x, uint8_t y) {
+    GF_CELL(gf,x,y).flags = GF_OBSTACLE;
 }
 
 void gridfluid_set_fluid(gridfluid_t gf, uint8_t x, uint8_t y) {
