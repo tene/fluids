@@ -31,6 +31,8 @@ static const uint8_t rindex[9] = {
 
 gridfluid_t gridfluid_create_empty_scene(uint8_t x, uint8_t y) {
     gridfluid_t gf = calloc(1, sizeof(struct gridfluid));
+    gf->x = x;
+    gf->y = y;
     gf->grid = calloc(x*y, sizeof(gridfluid_cell_t));
     gf->nextgrid = calloc(x*y, sizeof(gridfluid_cell_t));
     for (uint8_t i = 1; i < x-1; i++) {
