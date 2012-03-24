@@ -47,6 +47,7 @@ int main() {
     unsigned char buf[1];
     int running = 1;
     while (running) {
+        gridfluid_step(gf);
         render(gf);
         curs_xy(10,30);
         set_fg(rgb_f(1,1,1));
