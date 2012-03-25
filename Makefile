@@ -12,3 +12,4 @@ gridfluid.o: gridfluid.c gridfluid.h Makefile
 
 test: test.c npraises.h npraises.o gridfluid.o gridfluid.h Makefile
 	gcc $(CFLAGS) -o test test.c npraises.o gridfluid.o
+	find . -name 'core*' -exec rm {} \;

@@ -24,6 +24,8 @@ void gridfluid_set_fluid(gridfluid_t gf, size_t x, size_t y);
 void gridfluid_set_empty(gridfluid_t gf, size_t x, size_t y);
 void gridfluid_set_gravity(gridfluid_t gf, float g);
 uint8_t gridfluid_get_type(gridfluid_t gf, size_t x, size_t y);
+float gridfluid_get_pressure(gridfluid_t gf, size_t x, size_t y);
+float gridfluid_get_max_pressure(gridfluid_t gf);
 
 void gridfluid_step(gridfluid_t gf);
 

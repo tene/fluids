@@ -5,6 +5,8 @@
 #include <assert.h>
 
 void render(gridfluid_t gf) {
+    float mp = gridfluid_get_max_pressure(gf);
+    float pressure;
     set_bg(rgb_f(0,0,0));
     for (int x=0; x<40; x++) {
         for (int y=0; y<20; y++) {
@@ -19,8 +21,9 @@ void render(gridfluid_t gf) {
                     set_bg(rgb_f(0,0,0));
                     break;
                 case GF_FLUID:
-                    set_fg(rgb_f(0,0,1));
-                    set_bg(rgb_f(0,0,1));
+                    pressure = gridfluid_get_pressure(gf,x,y);
+                    set_fg(rgb_f(0,0,pressure/mp));
+                    set_bg(rgb_f(0,0,pressure/mp));
                     break;
                 case GF_INTERFACE:
                     set_fg(rgb_f(0,0,0.5));
@@ -34,10 +37,15 @@ void render(gridfluid_t gf) {
 
 int main() {
     gridfluid_t gf = gridfluid_create_empty_scene(40,20);
-    gridfluid_set_obstacle(gf,5,7);
-    gridfluid_set_fluid(gf,10,10);
     gridfluid_set_gravity(gf,1.0f);
+    gridfluid_set_obstacle(gf,5,7);
+    for (size_t i=7; i<40; i++) {
+        gridfluid_set_obstacle(gf,i,12);
+    }
+    /*
+    gridfluid_set_fluid(gf,10,10);
     assert(gridfluid_get_type(gf,5,7) == GF_OBSTACLE);
+    */
     if (!setup_screen()) {
         printf("Failed to setup screen; exiting\n");
         return(1);
@@ -49,9 +57,13 @@ int main() {
     while (running) {
         gridfluid_step(gf);
         render(gf);
-        curs_xy(10,30);
+        float mp = gridfluid_get_max_pressure(gf);
         set_fg(rgb_f(1,1,1));
         set_bg(rgb_f(0,0,0));
+
+        curs_xy(10,28);
+        printf("max pressure: %f     ", mp);
+        curs_xy(10,30);
 
         len = read(0, buf, 1);
         if (len == -1) {
