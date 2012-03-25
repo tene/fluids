@@ -1,5 +1,6 @@
 #include "gridfluid.h"
 #include <stdlib.h>
+#include <math.h>
 
 typedef struct gridfluid_cell {
     float df[9];
@@ -14,6 +15,7 @@ struct gridfluid {
     gridfluid_cell_t *nextgrid;
     float *pressure;
     float max_pressure;
+    float max_usqr;
 };
 
 static const float weights[9] = { 4./9., 1./9., 1./9., 1./9., 1./9.,
@@ -95,12 +97,14 @@ static void gridfluid_collide(gridfluid_t gf) {
     float uy=0;
     float eq[9];
     float max_pressure = 0;
+    float max_usqr = 0;
     for (size_t i=0; i < gf->x * gf->y; i++) {
         gridfluid_cell_t *cell = &gf->grid[i];
         if (cell->flags != GF_FLUID) {
             continue;
         }
         gridfluid_cell_macro(cell->df, &pressure, &ux, &uy);
+        float usqr = ux*ux + uy*uy;
         if (pressure > 100000)
             abort();
         uy -= 0.009;
@@ -108,6 +112,8 @@ static void gridfluid_collide(gridfluid_t gf) {
         gf->pressure[i] = pressure;
         if (pressure > max_pressure)
             max_pressure = pressure;
+        if (usqr > max_usqr)
+            max_usqr = usqr;
         for (size_t j=0; j<9; j++) {
             float f = cell->df[j];
             //float nf = f - omega * (f - eq[j]);
@@ -118,6 +124,7 @@ static void gridfluid_collide(gridfluid_t gf) {
         }
     }
     gf->max_pressure = max_pressure;
+    gf->max_usqr = max_usqr;
 }
 
 
@@ -169,6 +176,10 @@ float gridfluid_get_pressure(gridfluid_t gf, size_t x, size_t y) {
 
 float gridfluid_get_max_pressure(gridfluid_t gf) {
     return( gf->max_pressure );
+}
+
+float gridfluid_get_max_velocity(gridfluid_t gf) {
+    return( sqrtf(gf->max_usqr) );
 }
 
 void gridfluid_step(gridfluid_t gf) {

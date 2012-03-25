@@ -58,11 +58,14 @@ int main() {
         gridfluid_step(gf);
         render(gf);
         float mp = gridfluid_get_max_pressure(gf);
+        float mv = gridfluid_get_max_velocity(gf);
         set_fg(rgb_f(1,1,1));
         set_bg(rgb_f(0,0,0));
 
-        curs_xy(10,28);
+        curs_xy(10,26);
         printf("max pressure: %f     ", mp);
+        curs_xy(10,27);
+        printf("max velocity: %f     ", mv);
         curs_xy(10,30);
 
         len = read(0, buf, 1);
