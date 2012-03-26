@@ -5,6 +5,8 @@
 typedef struct gridfluid_cell {
     float df[9];
     gridfluid_state flags;
+    float mass;
+    float fluid;
 } gridfluid_cell_t;
 
 struct gridfluid {
@@ -33,30 +35,88 @@ static const uint8_t rindex[9] = {
 
 float omega=0.5;
 
+static void neighcount(gridfluid_t gf, size_t x, size_t y, size_t *empty, size_t *fluid) {
+    *fluid = 0;
+    *empty = 0;
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dx == dy)
+                continue;
+            switch(GF_CELL(gf, x+dx, y+dy).flags) {
+                case GF_FLUID:
+                    *fluid = *fluid+1;
+                    break;
+                case GF_EMPTY:
+                    *empty = *empty+1;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 static void gridfluid_stream(gridfluid_t gf) {
     for (size_t x = 0; x < gf->x; x++) {
         for (size_t y = 0; y < gf->y; y++) {
             gridfluid_cell_t *source = &GF_CELL(gf,x,y);
             gridfluid_cell_t *dest = &GF_NEXTCELL(gf,x,y);
-            if (source->flags != GF_FLUID) {
-                *dest = *source;
-                continue;
-            }
             dest->flags = source->flags;
-            for (size_t i=0; i<9; i++) {
-                int8_t dx = velocities[i][0];
-                int8_t dy = velocities[i][1];
-                gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
-                switch(neigh->flags) {
-                    case GF_OBSTACLE:
-                        dest->df[i] = source->df[rindex[i]];
-                        break;
-                    case GF_FLUID:
-                        dest->df[i] = neigh->df[i];
-                        break;
-                    default:
-                        break;
-                }
+            dest->mass = source->mass;
+            float pressure=0;
+            size_t emptycount;
+            size_t fluidcount;
+            switch (source->flags) {
+                case GF_FLUID:
+                    for (size_t i=0; i<9; i++) {
+                        int8_t dx = velocities[rindex[i]][0];
+                        int8_t dy = velocities[rindex[i]][1];
+                        gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
+                        switch(neigh->flags) {
+                            case GF_OBSTACLE:
+                                dest->df[i] = source->df[rindex[i]];
+                                break;
+                            case GF_FLUID:
+                            case GF_INTERFACE:
+                                dest->df[i] = neigh->df[i];
+                                break;
+                            default:
+                                break;
+                        }
+                        pressure += dest->df[i];
+                        dest->fluid = 1;
+                        dest->mass = pressure;
+                    }
+                    break;
+                case GF_INTERFACE:
+                    neighcount(gf, x, y, &emptycount, &fluidcount);
+                    for (size_t i=0; i<9; i++) {
+                        int8_t dx = velocities[i][0];
+                        int8_t dy = velocities[i][1];
+                        gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
+                        switch(neigh->flags) {
+                            case GF_OBSTACLE:
+                                dest->df[i] = source->df[rindex[i]];
+                                break;
+                            case GF_FLUID:
+                                dest->mass += neigh->df[rindex[i]];
+                                dest->mass -= source->df[i];
+                                dest->df[i] = neigh->df[i];
+                                break;
+                            case GF_INTERFACE:
+                                dest->df[i] = neigh->df[i];
+                                break;
+                            default:
+                                break;
+                        }
+                        pressure += dest->df[i];
+                        dest->fluid = dest->mass/pressure;
+                    }
+                    break;
+                case GF_OBSTACLE:
+                case GF_EMPTY:
+                    *dest = *source;
+                    break;
             }
         }
     }
