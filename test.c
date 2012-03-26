@@ -67,6 +67,7 @@ int main() {
     gridfluid_properties_t *props;
     while (running) {
         for (size_t i = 0; i < unpaused * steps_per_frame; i++) {
+            curs_xy(10,31);
             gridfluid_step(gf);
         }
         props = gridfluid_get_properties(gf);

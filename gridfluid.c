@@ -210,6 +210,7 @@ static void gridfluid_collide(gridfluid_t gf) {
     float max_usqr = 0;
     gf->filled = 0;
     gf->emptied = 0;
+    memset(gf->changeflags, 0, gf->x * gf->y * sizeof(gridfluid_change_flag));
     for (size_t i=0; i < gf->x * gf->y; i++) {
         gridfluid_cell_t *cell = &gf->grid[i];
         if (cell->flags != GF_FLUID && cell->flags != GF_INTERFACE) {
@@ -229,11 +230,11 @@ static void gridfluid_collide(gridfluid_t gf) {
             min_pressure = pressure;
         if (usqr > max_usqr)
             max_usqr = usqr;
-        if (cell->flags == GF_INTERFACE && pressure > 1 + change_fudge) {
+        if (cell->flags == GF_INTERFACE && cell->mass > 1 + change_fudge) {
             gf->changeflags[i] = GF_CHANGE_FILLED;
             gf->filled++;
         }
-        if (cell->flags == GF_INTERFACE && pressure < 0 - change_fudge) {
+        if (cell->flags == GF_INTERFACE && cell->mass < 0 - change_fudge) {
             gf->changeflags[i] = GF_CHANGE_EMPTIED;
             gf->emptied++;
         }
@@ -406,14 +407,12 @@ gridfluid_t gridfluid_create_empty_scene(size_t x, size_t y) {
     gf->props->pressure = calloc(x*y, sizeof(float));
     for (size_t i = 1; i < x-1; i++) {
         for (size_t j = 1; j < y-1; j++) {
-            /*
             gridfluid_set_fluid(gf, i, j);
             if (i == x/3 || i < 4 || i >= x-4 || j < 4 || j >= y-4)
                 GF_CELL(gf,i,j).flags = GF_INTERFACE;
             if (i > x/3 || i < 3 || i >= x-3 || j < 3 || j >= y-3)
                 GF_CELL(gf,i,j).flags = GF_EMPTY;
-            */
-            GF_CELL(gf,i,j).flags = GF_EMPTY;
+            //GF_CELL(gf,i,j).flags = GF_EMPTY;
         }
     }
     return(gf);
@@ -421,6 +420,10 @@ gridfluid_t gridfluid_create_empty_scene(size_t x, size_t y) {
 
 void gridfluid_free(gridfluid_t gf) {
     free(gf->grid);
+    free(gf->nextgrid);
+    free(gf->changeflags);
+    free(gf->props->pressure);
+    free(gf->props);
     free(gf);
 }
 

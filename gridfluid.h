@@ -38,6 +38,7 @@ uint8_t gridfluid_get_type(gridfluid_t gf, size_t x, size_t y);
 gridfluid_properties_t *gridfluid_get_properties(gridfluid_t gf);
 
 void gridfluid_step(gridfluid_t gf);
+void gridfluid_debug(gridfluid_t gf);
 
 #pragma GCC visibility pop
 
