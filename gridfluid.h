@@ -23,6 +23,7 @@ typedef struct gridfluid_properties {
     float max_pressure;
     float min_pressure;
     float max_velocity;
+    float total_mass;
 } gridfluid_properties_t;
 
 gridfluid_t gridfluid_create_empty_scene(size_t x, size_t y);

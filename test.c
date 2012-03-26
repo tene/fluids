@@ -9,6 +9,7 @@ void render(gridfluid_t gf) {
     float maxp = props->max_pressure;
     float minp = props->min_pressure;
     float pressure;
+    char *draw = " ";
     set_bg(rgb_f(0,0,0));
     for (int x=0; x < props->x; x++) {
         for (int y=0; y < props->y; y++) {
@@ -17,10 +18,12 @@ void render(gridfluid_t gf) {
                 case GF_OBSTACLE:
                     set_fg(rgb_f(1,1,1));
                     set_bg(rgb_f(1,1,1));
+                    draw = "█";
                     break;
                 case GF_EMPTY:
                     set_fg(rgb_f(0,0,0));
                     set_bg(rgb_f(0,0,0));
+                    draw = "█";
                     break;
                 case GF_FLUID:
                     pressure = props->pressure[x + y*props->x];
@@ -28,24 +31,26 @@ void render(gridfluid_t gf) {
                     set_bg(rgb_f(0,0,0.2 + 0.8*(pressure-minp)/(maxp-minp)));
                     break;
                 case GF_INTERFACE:
-                    set_fg(rgb_f(0,0,0.5));
-                    set_bg(rgb_f(0,0,0.5));
+                    pressure = props->pressure[x + y*props->x];
+                    set_fg(rgb_f(0,0,0.2 + 0.8*(pressure-minp)/(maxp-minp)));
+                    set_bg(rgb_f(0,0,0));
+                    draw = "▓";
                     break;
             }
-            printf("█");
+            printf("%s", draw);
         }
     }
 }
 
 int main() {
     gridfluid_t gf = gridfluid_create_empty_scene(40,20);
-    gridfluid_set_gravity(gf,1.0f);
     gridfluid_set_obstacle(gf,5,7);
     for (size_t i=7; i<40; i++) {
         gridfluid_set_obstacle(gf,i,12);
     }
-    /*
+    gridfluid_set_gravity(gf, 0.01);
     gridfluid_set_fluid(gf,10,10);
+    /*
     assert(gridfluid_get_type(gf,5,7) == GF_OBSTACLE);
     */
     if (!setup_screen()) {
@@ -58,9 +63,10 @@ int main() {
     int running = 1;
     unsigned int frame_count = 0;
     unsigned int steps_per_frame = 1;
+    int unpaused = 0;
     gridfluid_properties_t *props;
     while (running) {
-        for (size_t i = 0; i < steps_per_frame; i++) {
+        for (size_t i = 0; i < unpaused * steps_per_frame; i++) {
             gridfluid_step(gf);
         }
         props = gridfluid_get_properties(gf);
@@ -78,6 +84,8 @@ int main() {
         curs_xy(10,27);
         printf("max velocity: %f     ", maxv);
         curs_xy(10,28);
+        printf("total mass: %f     ", props->total_mass);
+        curs_xy(10,29);
         printf("step count: %d", frame_count++ * steps_per_frame);
         curs_xy(10,30);
 
@@ -89,6 +97,12 @@ int main() {
                 case 3:
                 case 'q':
                     running = 0;
+                    break;
+                case 's':
+                    gridfluid_step(gf);
+                    break;
+                case ' ':
+                    unpaused = unpaused ? 0 : 1;
                     break;
                 default:
                     printf("read: %3u        ", buf[0]);
