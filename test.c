@@ -5,11 +5,13 @@
 #include <assert.h>
 
 void render(gridfluid_t gf) {
-    float mp = gridfluid_get_max_pressure(gf);
+    gridfluid_properties_t *props = gridfluid_get_properties(gf);
+    float maxp = props->max_pressure;
+    float minp = props->min_pressure;
     float pressure;
     set_bg(rgb_f(0,0,0));
-    for (int x=0; x<40; x++) {
-        for (int y=0; y<20; y++) {
+    for (int x=0; x < props->x; x++) {
+        for (int y=0; y < props->y; y++) {
             curs_xy(x,y);
             switch(gridfluid_get_type(gf,x,y)) {
                 case GF_OBSTACLE:
@@ -21,9 +23,9 @@ void render(gridfluid_t gf) {
                     set_bg(rgb_f(0,0,0));
                     break;
                 case GF_FLUID:
-                    pressure = gridfluid_get_pressure(gf,x,y);
-                    set_fg(rgb_f(0,0,pressure/mp));
-                    set_bg(rgb_f(0,0,pressure/mp));
+                    pressure = props->pressure[x + y*props->x];
+                    set_fg(rgb_f(0,0,0.2 + 0.8*(pressure-minp)/(maxp-minp)));
+                    set_bg(rgb_f(0,0,0.2 + 0.8*(pressure-minp)/(maxp-minp)));
                     break;
                 case GF_INTERFACE:
                     set_fg(rgb_f(0,0,0.5));
@@ -54,18 +56,29 @@ int main() {
     ssize_t len;
     unsigned char buf[1];
     int running = 1;
+    unsigned int frame_count = 0;
+    unsigned int steps_per_frame = 1;
+    gridfluid_properties_t *props;
     while (running) {
-        gridfluid_step(gf);
+        for (size_t i = 0; i < steps_per_frame; i++) {
+            gridfluid_step(gf);
+        }
+        props = gridfluid_get_properties(gf);
         render(gf);
-        float mp = gridfluid_get_max_pressure(gf);
-        float mv = gridfluid_get_max_velocity(gf);
+        float maxp = props->max_pressure;
+        float minp = props->min_pressure;
+        float maxv = props->max_velocity;
         set_fg(rgb_f(1,1,1));
         set_bg(rgb_f(0,0,0));
 
+        curs_xy(10,25);
+        printf("min pressure: %f     ", minp);
         curs_xy(10,26);
-        printf("max pressure: %f     ", mp);
+        printf("max pressure: %f     ", maxp);
         curs_xy(10,27);
-        printf("max velocity: %f     ", mv);
+        printf("max velocity: %f     ", maxv);
+        curs_xy(10,28);
+        printf("step count: %d", frame_count++ * steps_per_frame);
         curs_xy(10,30);
 
         len = read(0, buf, 1);

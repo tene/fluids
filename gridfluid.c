@@ -10,12 +10,9 @@ typedef struct gridfluid_cell {
 struct gridfluid {
     size_t x;
     size_t y;
-    float gravity;
     gridfluid_cell_t *grid;
     gridfluid_cell_t *nextgrid;
-    float *pressure;
-    float max_pressure;
-    float max_usqr;
+    gridfluid_properties_t *props;
 };
 
 static const float weights[9] = { 4./9., 1./9., 1./9., 1./9., 1./9.,
@@ -97,6 +94,7 @@ static void gridfluid_collide(gridfluid_t gf) {
     float uy=0;
     float eq[9];
     float max_pressure = 0;
+    float min_pressure = INFINITY;
     float max_usqr = 0;
     for (size_t i=0; i < gf->x * gf->y; i++) {
         gridfluid_cell_t *cell = &gf->grid[i];
@@ -107,11 +105,13 @@ static void gridfluid_collide(gridfluid_t gf) {
         float usqr = ux*ux + uy*uy;
         if (pressure > 100000)
             abort();
-        uy -= 0.009;
+        uy -= 0.001;
         gridfluid_eq(pressure, ux, uy, eq);
-        gf->pressure[i] = pressure;
+        gf->props->pressure[i] = pressure;
         if (pressure > max_pressure)
             max_pressure = pressure;
+        if (pressure < min_pressure)
+            min_pressure = pressure;
         if (usqr > max_usqr)
             max_usqr = usqr;
         for (size_t j=0; j<9; j++) {
@@ -123,18 +123,22 @@ static void gridfluid_collide(gridfluid_t gf) {
             cell->df[j] = nf;
         }
     }
-    gf->max_pressure = max_pressure;
-    gf->max_usqr = max_usqr;
+    gf->props->min_pressure = min_pressure;
+    gf->props->max_pressure = max_pressure;
+    gf->props->max_velocity = sqrtf(max_usqr);
 }
 
 
 gridfluid_t gridfluid_create_empty_scene(size_t x, size_t y) {
     gridfluid_t gf = calloc(1, sizeof(struct gridfluid));
+    gf->props = calloc(1, sizeof(struct gridfluid_properties));
     gf->x = x;
     gf->y = y;
     gf->grid = calloc(x*y, sizeof(gridfluid_cell_t));
     gf->nextgrid = calloc(x*y, sizeof(gridfluid_cell_t));
-    gf->pressure = calloc(x*y, sizeof(float));
+    gf->props->x = x;
+    gf->props->y = y;
+    gf->props->pressure = calloc(x*y, sizeof(float));
     for (size_t i = 1; i < x-1; i++) {
         for (size_t j = 1; j < y-1; j++) {
             gridfluid_set_fluid(gf, i, j);
@@ -154,7 +158,7 @@ void gridfluid_set_obstacle(gridfluid_t gf, size_t x, size_t y) {
 
 void gridfluid_set_fluid(gridfluid_t gf, size_t x, size_t y) {
     gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
-    gridfluid_eq(1,0.5,0.00,cell->df);
+    gridfluid_eq(1 + 0.001 * x,0.01,0.00,cell->df);
     cell->flags = GF_FLUID;
 }
 
@@ -163,23 +167,15 @@ void gridfluid_set_empty(gridfluid_t gf, size_t x, size_t y) {
 }
 
 void gridfluid_set_gravity(gridfluid_t gf, float g) {
-    gf->gravity = g;
+    gf->props->gravity = g;
 }
 
 uint8_t gridfluid_get_type(gridfluid_t gf, size_t x, size_t y) {
     return( GF_CELL(gf,x,y).flags );
 }
 
-float gridfluid_get_pressure(gridfluid_t gf, size_t x, size_t y) {
-    return( gf->pressure[ x + y * gf->x ] );
-}
-
-float gridfluid_get_max_pressure(gridfluid_t gf) {
-    return( gf->max_pressure );
-}
-
-float gridfluid_get_max_velocity(gridfluid_t gf) {
-    return( sqrtf(gf->max_usqr) );
+gridfluid_properties_t *gridfluid_get_properties(gridfluid_t gf) {
+    return( gf->props );
 }
 
 void gridfluid_step(gridfluid_t gf) {

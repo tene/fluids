@@ -1,4 +1,4 @@
-CFLAGS := -Wall -Werror -g -ggdb -fvisibility=hidden -std=c99 -I. -ltinfo
+CFLAGS := -Wall -Werror -g -ggdb -fvisibility=hidden -std=c99 -I. -ltinfo -O3
 OBJS := npraises.o gridfluid.o
 PROGS := test
 
