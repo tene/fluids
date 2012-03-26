@@ -69,21 +69,22 @@ static void gridfluid_stream(gridfluid_t gf) {
             switch (source->flags) {
                 case GF_FLUID:
                     for (size_t i=0; i<9; i++) {
-                        int8_t dx = velocities[rindex[i]][0];
-                        int8_t dy = velocities[rindex[i]][1];
+                        size_t o = rindex[i];
+                        int8_t dx = velocities[i][0];
+                        int8_t dy = velocities[i][1];
                         gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
                         switch(neigh->flags) {
                             case GF_OBSTACLE:
-                                dest->df[i] = source->df[rindex[i]];
+                                dest->df[o] = source->df[i];
                                 break;
                             case GF_FLUID:
                             case GF_INTERFACE:
-                                dest->df[i] = neigh->df[i];
+                                dest->df[o] = neigh->df[o];
                                 break;
                             default:
                                 break;
                         }
-                        pressure += dest->df[i];
+                        pressure += dest->df[o];
                         dest->fluid = 1;
                         dest->mass = pressure;
                     }
@@ -91,25 +92,36 @@ static void gridfluid_stream(gridfluid_t gf) {
                 case GF_INTERFACE:
                     neighcount(gf, x, y, &emptycount, &fluidcount);
                     for (size_t i=0; i<9; i++) {
+                        size_t o = rindex[i];
                         int8_t dx = velocities[i][0];
                         int8_t dy = velocities[i][1];
+                        size_t iemptycount, ifluidcount;
                         gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
                         switch(neigh->flags) {
                             case GF_OBSTACLE:
-                                dest->df[i] = source->df[rindex[i]];
+                                dest->df[o] = source->df[i];
                                 break;
                             case GF_FLUID:
-                                dest->mass += neigh->df[rindex[i]];
+                                dest->mass += neigh->df[o];
                                 dest->mass -= source->df[i];
-                                dest->df[i] = neigh->df[i];
+                                dest->df[o] = neigh->df[o];
                                 break;
                             case GF_INTERFACE:
-                                dest->df[i] = neigh->df[i];
+                                dest->df[o] = neigh->df[o];
+                                neighcount(gf, x+dx, y+dy, &iemptycount, &ifluidcount);
+                                float fluidratio = (source->fluid + neigh->fluid)/2;
+                                int tmp1 = emptycount == iemptycount && fluidcount == ifluidcount;
+                                float deltamass = 0;
+                                if (tmp1 || !emptycount || !ifluidcount)
+                                    deltamass += neigh->df[o];
+                                if (tmp1 || !iemptycount || !fluidcount)
+                                    deltamass -= source->df[i];
+                                dest->mass += deltamass * fluidratio;
                                 break;
                             default:
                                 break;
                         }
-                        pressure += dest->df[i];
+                        pressure += dest->df[o];
                         dest->fluid = dest->mass/pressure;
                     }
                     break;
@@ -165,7 +177,7 @@ static void gridfluid_collide(gridfluid_t gf) {
         float usqr = ux*ux + uy*uy;
         if (pressure > 100000)
             abort();
-        uy -= 0.001;
+        uy += 0.001;
         gridfluid_eq(pressure, ux, uy, eq);
         gf->props->pressure[i] = pressure;
         if (pressure > max_pressure)
