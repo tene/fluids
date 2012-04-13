@@ -35,6 +35,10 @@ void set_bg(uint8_t c) {
     putp(tiparm(set_a_background, c));
 }
 
+void clear() {
+    putp(tiparm(clear_screen));
+}
+
 static struct termios term_settings;
 
 int setup_screen() {

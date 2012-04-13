@@ -16,6 +16,8 @@ void set_fg(uint8_t c);
 
 void set_bg(uint8_t c);
 
+void clear();
+
 int setup_screen();
 
 void cleanup_screen();

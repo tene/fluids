@@ -20,6 +20,7 @@ typedef struct gridfluid_properties {
     size_t y;
     float gravity;
     float *pressure;
+    float *mass;
     float max_pressure;
     float min_pressure;
     float max_velocity;

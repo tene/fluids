@@ -205,9 +205,6 @@ static void gridfluid_collide(gridfluid_t gf) {
     float ux=0;
     float uy=0;
     float eq[9];
-    float max_pressure = 0;
-    float min_pressure = INFINITY;
-    float max_usqr = 0;
     gf->filled = 0;
     gf->emptied = 0;
     memset(gf->changeflags, 0, gf->x * gf->y * sizeof(gridfluid_change_flag));
@@ -217,19 +214,13 @@ static void gridfluid_collide(gridfluid_t gf) {
             continue;
         }
         gridfluid_cell_macro(cell->df, &pressure, &ux, &uy);
-        float usqr = ux*ux + uy*uy;
         if (pressure > 100000)
             abort();
-        uy += gf->gravity;
+        //uy += gf->gravity;
         gridfluid_eq(pressure, ux, uy, eq);
         gf->props->pressure[i] = pressure;
+        gf->props->mass[i] = cell->mass;
         cell->fluid = cell->mass/pressure;
-        if (pressure > max_pressure)
-            max_pressure = pressure;
-        if (pressure < min_pressure)
-            min_pressure = pressure;
-        if (usqr > max_usqr)
-            max_usqr = usqr;
         if (cell->flags == GF_INTERFACE && cell->mass > 1 + change_fudge) {
             gf->changeflags[i] = GF_CHANGE_FILLED;
             gf->filled++;
@@ -247,9 +238,6 @@ static void gridfluid_collide(gridfluid_t gf) {
             cell->df[j] = nf;
         }
     }
-    gf->props->min_pressure = min_pressure;
-    gf->props->max_pressure = max_pressure;
-    gf->props->max_velocity = sqrtf(max_usqr);
 }
 
 static void gridfluid_avg_macro(gridfluid_t gf, size_t x, size_t y, float *pressure, float *ux, float *uy) {
@@ -405,14 +393,18 @@ gridfluid_t gridfluid_create_empty_scene(size_t x, size_t y) {
     gf->props->x = x;
     gf->props->y = y;
     gf->props->pressure = calloc(x*y, sizeof(float));
+    gf->props->mass = calloc(x*y, sizeof(float));
     for (size_t i = 1; i < x-1; i++) {
         for (size_t j = 1; j < y-1; j++) {
+            GF_CELL(gf,i,j).flags = GF_EMPTY;
+            /*
             gridfluid_set_fluid(gf, i, j);
             if (i == x/3 || i < 4 || i >= x-4 || j < 4 || j >= y-4)
                 GF_CELL(gf,i,j).flags = GF_INTERFACE;
             if (i > x/3 || i < 3 || i >= x-3 || j < 3 || j >= y-3)
                 GF_CELL(gf,i,j).flags = GF_EMPTY;
             //GF_CELL(gf,i,j).flags = GF_EMPTY;
+            */
         }
     }
     return(gf);
@@ -423,6 +415,7 @@ void gridfluid_free(gridfluid_t gf) {
     free(gf->nextgrid);
     free(gf->changeflags);
     free(gf->props->pressure);
+    free(gf->props->mass);
     free(gf->props);
     free(gf);
 }
@@ -445,8 +438,8 @@ void gridfluid_set_fluid(gridfluid_t gf, size_t x, size_t y) {
             if (neigh->flags == GF_EMPTY) {
                 gridfluid_eq(1,0.00,0.00,neigh->df);
                 neigh->flags = GF_INTERFACE;
-                neigh->mass = 0.1;
-                neigh->fluid = 0.1;
+                neigh->mass = 0.9;
+                neigh->fluid = 0.9;
             }
         }
     }
@@ -465,6 +458,32 @@ uint8_t gridfluid_get_type(gridfluid_t gf, size_t x, size_t y) {
 }
 
 gridfluid_properties_t *gridfluid_get_properties(gridfluid_t gf) {
+    float pressure=0;
+    float ux=0;
+    float uy=0;
+    float max_pressure = 0;
+    float min_pressure = INFINITY;
+    float max_usqr = 0;
+    for (size_t i=0; i < gf->x * gf->y; i++) {
+        gridfluid_cell_t *cell = &gf->grid[i];
+        if (cell->flags != GF_FLUID && cell->flags != GF_INTERFACE) {
+            continue;
+        }
+        gridfluid_cell_macro(cell->df, &pressure, &ux, &uy);
+        float usqr = ux*ux + uy*uy;
+        gf->props->pressure[i] = pressure;
+        gf->props->mass[i] = cell->mass;
+        cell->fluid = cell->mass/pressure;
+        if (pressure > max_pressure)
+            max_pressure = pressure;
+        if (pressure < min_pressure)
+            min_pressure = pressure;
+        if (usqr > max_usqr)
+            max_usqr = usqr;
+    }
+    gf->props->min_pressure = min_pressure;
+    gf->props->max_pressure = max_pressure;
+    gf->props->max_velocity = sqrtf(max_usqr);
     return( gf->props );
 }
 
