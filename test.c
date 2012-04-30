@@ -8,7 +8,7 @@
 void render(gridfluid_t gf) {
     gridfluid_properties_t *props = gridfluid_get_properties(gf);
     float maxp = props->max_pressure;
-    float minp = 0; //props->min_pressure;
+    float minp = props->min_pressure;
     float pressure;
     char *draw = " ";
     set_bg(rgb_f(0,0,0));
@@ -48,7 +48,7 @@ int main() {
     size_t scene_y = 20;
     gridfluid_t gf = gridfluid_create_empty_scene(scene_x, scene_y);
     //gridfluid_set_obstacle(gf,5,7);
-    for (size_t i=7; i<40; i++) {
+    for (size_t i=9; i<40; i++) {
         gridfluid_set_obstacle(gf,i,12);
     }
     gridfluid_set_gravity(gf, 0.01);
@@ -57,7 +57,11 @@ int main() {
             gridfluid_set_fluid(gf,fx, fy);
         }
     }
-    gridfluid_set_fluid(gf,10,10);
+    for (size_t fy = 3; fy < 5; fy++) {
+        for (size_t fx = 4; fx < 20; fx++) {
+            gridfluid_set_fluid(gf,fx, fy);
+        }
+    }
     /*
     assert(gridfluid_get_type(gf,5,7) == GF_OBSTACLE);
     */
@@ -106,8 +110,8 @@ int main() {
         curs_xy(10,30);
         printf("debugging: %s", debugging ? "on ": "off");
         if (debugging) {
-            float mass = props->mass[debug_x + debug_y * scene_y];
-            float pressure = props->pressure[debug_x + debug_y * scene_y];
+            float mass = props->mass[debug_x + debug_y * scene_x];
+            float pressure = props->pressure[debug_x + debug_y * scene_x];
             curs_xy(50,10);
             printf("x: %zu, y: %zu", debug_x, debug_y);
             curs_xy(50,11);
@@ -130,6 +134,8 @@ int main() {
                     break;
                 case 's':
                     gridfluid_step(gf);
+                    step_count++;
+                    render(gf);
                     break;
                 case 'd':
                     debugging = debugging ? false : true;
@@ -153,8 +159,8 @@ int main() {
                     printf("read: %3u        ", buf[0]);
                     break;
             }
-            clear();
-            render(gf);
+            //clear();
+            //render(gf);
         }
     }
     cleanup_screen();

@@ -3,6 +3,12 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
+
+//#define check_valid(cell) assert(cell->flags == GF_EMPTY || cell->flags == GF_OBSTACLE || ( cell->mass > 0 && cell->fluid > 0))
+
+// negative mass is fine sometimes (emptied interface cells)
+#define check_valid(cell) assert(cell->flags == GF_EMPTY || cell->flags == GF_OBSTACLE || 1 || ( cell->mass > 0 && cell->fluid > 0))
 
 typedef struct gridfluid_cell {
     float df[9];
@@ -30,7 +36,7 @@ struct gridfluid {
     size_t emptied;
 };
 
-static const float change_fudge = 0.001;
+static const float change_fudge = 0.0001;
 
 static const float weights[9] = { 4./9., 1./9., 1./9., 1./9., 1./9.,
                              1./36., 1./36., 1./36., 1./36. };
@@ -48,7 +54,22 @@ static const uint8_t rindex[9] = {
 #define GF_CELL(gf,cx,cy) (gf->grid[(cx) + (cy)*gf->x])
 #define GF_NEXTCELL(gf,cx,cy) (gf->nextgrid[(cx) + (cy)*gf->x])
 
-float omega=0.75;
+
+static void update_cell(gridfluid_cell_t *cell, float df[9], gridfluid_state flags, float mass, float fluid) {
+    /*
+    check_valid(cell);
+    for (size_t i = 0; i<9; i++) {
+        assert(df[i] >= 0);
+    }
+    */
+    memcpy(cell->df, df, 9*sizeof(float));
+    cell->flags = flags;
+    cell->mass = mass;
+    cell->fluid = fluid;
+    check_valid(cell);
+}
+
+float omega=0.50;
 
 static void neighcount(gridfluid_t gf, size_t x, size_t y, size_t *empty, size_t *fluid) {
     *fluid = 0;
@@ -101,8 +122,8 @@ static void gridfluid_eq(float pressure, float ux, float uy, float *eq) {
         float ey = velocities[i][1];
         float edotu = (ex*ux + ey*uy);
         eq[i] = w * ( pressure + 3*edotu - 1.5*usqr + 4.5*edotu*edotu);
-        if (eq[i] < 0)
-            abort();
+        //if (eq[i] < 0)
+        //    abort();
     }
 }
 
@@ -110,9 +131,11 @@ static void gridfluid_stream(gridfluid_t gf) {
     for (size_t x = 0; x < gf->x; x++) {
         for (size_t y = 0; y < gf->y; y++) {
             gridfluid_cell_t *source = &GF_CELL(gf,x,y);
-            gridfluid_cell_t *dest = &GF_NEXTCELL(gf,x,y);
-            dest->flags = source->flags;
-            dest->mass = source->mass;
+            gridfluid_state flags = source->flags;
+            float df[9] = {0,0,0,0,0,0,0,0,0};
+            float mass = source->mass;
+            float fluid;
+            //check_valid(source);
             float pressure=0;
             size_t emptycount;
             size_t fluidcount;
@@ -125,19 +148,19 @@ static void gridfluid_stream(gridfluid_t gf) {
                         gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
                         switch(neigh->flags) {
                             case GF_OBSTACLE:
-                                dest->df[o] = source->df[i];
+                                df[o] = source->df[i];
                                 break;
                             case GF_FLUID:
                             case GF_INTERFACE:
-                                dest->mass += neigh->df[o];
-                                dest->mass -= source->df[i];
-                                dest->df[o] = neigh->df[o];
+                                mass += neigh->df[o];
+                                mass -= source->df[i];
+                                df[o] = neigh->df[o];
                                 break;
                             default:
                                 break;
                         }
-                        pressure += dest->df[o];
-                        dest->fluid = 1;
+                        pressure += df[o];
+                        fluid = 1;
                         //dest->mass = pressure;
                     }
                     break;
@@ -149,7 +172,7 @@ static void gridfluid_stream(gridfluid_t gf) {
                     gridfluid_cell_normal(gf, x, y, &nx, &ny);
                     gridfluid_cell_macro(source->df, &oldpressure, &ux, &uy);
                     gridfluid_eq(gf->atmosphere, ux, uy, eqdf);
-                    for (size_t i=0; i<9; i++) {
+                    for (size_t i=1; i<9; i++) {
                         size_t o = rindex[i];
                         int8_t dx = velocities[i][0];
                         int8_t dy = velocities[i][1];
@@ -157,15 +180,15 @@ static void gridfluid_stream(gridfluid_t gf) {
                         gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
                         switch(neigh->flags) {
                             case GF_OBSTACLE:
-                                dest->df[o] = source->df[i];
+                                df[o] = source->df[i];
                                 break;
                             case GF_FLUID:
-                                dest->mass += neigh->df[o];
-                                dest->mass -= source->df[i];
-                                dest->df[o] = neigh->df[o];
+                                mass += neigh->df[o];
+                                mass -= source->df[i];
+                                df[o] = neigh->df[o];
                                 break;
                             case GF_INTERFACE:
-                                dest->df[o] = neigh->df[o];
+                                df[o] = neigh->df[o];
                                 neighcount(gf, x+dx, y+dy, &iemptycount, &ifluidcount);
                                 float fluidratio = (source->fluid + neigh->fluid)/2;
                                 int tmp1 = emptycount == iemptycount && fluidcount == ifluidcount;
@@ -174,27 +197,32 @@ static void gridfluid_stream(gridfluid_t gf) {
                                     deltamass += neigh->df[o];
                                 if (tmp1 || !iemptycount || !fluidcount)
                                     deltamass -= source->df[i];
-                                dest->mass += deltamass * fluidratio;
+                                mass += deltamass * fluidratio;
                                 break;
                             case GF_EMPTY:
-                                dest->df[o] = eqdf[i] + eqdf[o] - source->df[i];
+                                df[o] = eqdf[i] + eqdf[o] - source->df[i];
                                 break;
                             default:
+                                abort();
                                 break;
                         }
                         if (neigh->flags != GF_EMPTY && dot2f(nx, ny, dx, dy) > 0)
-                            dest->df[o] = eqdf[i] + eqdf[o] - source->df[i];
-                        pressure += dest->df[o];
-                        if (dest->df[o] < 0)
-                            abort();
+                            df[o] = eqdf[i] + eqdf[o] - source->df[i];
+                        pressure += df[o];
+                        //if (df[o] < 0)
+                        //    abort();
                     }
-                    dest->fluid = dest->mass/pressure;
+                    fluid = mass/pressure;
                     break;
                 case GF_OBSTACLE:
                 case GF_EMPTY:
-                    *dest = *source;
+                    fluid = 0;
+                    mass = 0;
                     break;
             }
+            gridfluid_cell_t *dest = &GF_NEXTCELL(gf,x,y);
+            update_cell(dest,df,flags,mass,fluid);
+            check_valid(dest);
             gf->props->total_mass += dest->mass;
         }
     }
@@ -216,7 +244,7 @@ static void gridfluid_collide(gridfluid_t gf) {
         gridfluid_cell_macro(cell->df, &pressure, &ux, &uy);
         if (pressure > 100000)
             abort();
-        //uy += gf->gravity;
+        uy += gf->gravity;
         gridfluid_eq(pressure, ux, uy, eq);
         gf->props->pressure[i] = pressure;
         gf->props->mass[i] = cell->mass;
@@ -233,8 +261,8 @@ static void gridfluid_collide(gridfluid_t gf) {
             float f = cell->df[j];
             //float nf = f - omega * (f - eq[j]);
             float nf = f * (1-omega) + omega * eq[j];
-            if (nf < 0)
-                abort();
+            //if (nf < 0)
+            //    abort();
             cell->df[j] = nf;
         }
     }
@@ -275,8 +303,9 @@ static void gridfluid_avg_macro(gridfluid_t gf, size_t x, size_t y, float *press
 }
 
 static void distribmass(gridfluid_t gf, size_t x, size_t y) {
-    float partials[9];
+    float partials[9] = {0,0,0,0,0,0,0};
     float total = 0;
+    size_t count = 0;
     float nx=0;
     float ny=0;
     gridfluid_cell_normal(gf, x, y, &nx, &ny);
@@ -303,8 +332,12 @@ static void distribmass(gridfluid_t gf, size_t x, size_t y) {
         if (n_e > 0) {
             total += n_e;
             partials[i] = n_e;
+            count++;
         }
 
+    }
+    if (count == 0) {
+        return;
     }
     for (size_t i=0; i<9; i++) {
         int dx = velocities[i][0];
@@ -315,14 +348,17 @@ static void distribmass(gridfluid_t gf, size_t x, size_t y) {
             source->mass -= mass;
             gf->props->total_mass -= mass;
             source->fluid = source->mass/pressure;
+            check_valid(source);
             continue;
         }
         if (neigh->flags != GF_INTERFACE)
             continue;
+        gridfluid_cell_macro(neigh->df, &pressure, &ux, &uy);
         float deltamass = mass * partials[i]/total;
         neigh->mass += deltamass;
         gf->props->total_mass += deltamass;
         neigh->fluid = neigh->mass/pressure;
+        check_valid(neigh);
     }
 }
 
@@ -332,11 +368,13 @@ static void gridfluid_cleanup(gridfluid_t gf) {
             gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
             if (gf->changeflags[x + y*gf->x] != GF_CHANGE_FILLED)
                 continue;
+            fprintf(stderr, "Filled %zu,%zu\n", x, y);
+            fflush(stderr);
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
-                    if (neigh->flags == GF_INTERFACE)
-                        gf->changeflags[x+y*gf->x] = GF_CHANGE_NONE;
+                    if (neigh->flags == GF_INTERFACE && gf->changeflags[(x+dx)+(y+dy)*gf->x] == GF_CHANGE_EMPTIED )
+                        gf->changeflags[(x+dx)+(y+dy)*gf->x] = GF_CHANGE_NONE;
                     if (neigh->flags != GF_EMPTY)
                         continue;
                     float pressure = 0;
@@ -346,7 +384,9 @@ static void gridfluid_cleanup(gridfluid_t gf) {
                     gridfluid_avg_macro(gf,x+dx,y+dy,&pressure,&ux,&uy);
                     gridfluid_eq(pressure, ux, uy, eq);
                     neigh->flags = GF_INTERFACE;
+                    neigh->fluid = neigh->mass/pressure;
                     memcpy(neigh->df, eq, 9*sizeof(float));
+                    // neigh might not be valid here, until after mass is distributed
                 }
             }
             cell->flags = GF_FLUID;
@@ -357,6 +397,8 @@ static void gridfluid_cleanup(gridfluid_t gf) {
             gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
             if (gf->changeflags[x + y*gf->x] != GF_CHANGE_EMPTIED)
                 continue;
+            fprintf(stderr, "Emptied %zu,%zu\n", x, y);
+            fflush(stderr);
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
@@ -370,11 +412,18 @@ static void gridfluid_cleanup(gridfluid_t gf) {
     }
     for (size_t x = 0; x < gf->x; x++) {
         for (size_t y = 0; y < gf->y; y++) {
-            //gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
+            gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
             if (gf->changeflags[x + y*gf->x] == GF_CHANGE_NONE)
                 continue;
             distribmass(gf,x,y);
+            check_valid(cell);
             gf->changeflags[x + y*gf->x] = GF_CHANGE_NONE;
+        }
+    }
+    for (size_t x = 0; x < gf->x; x++) {
+        for (size_t y = 0; y < gf->y; y++) {
+            gridfluid_cell_t *cell = &GF_CELL(gf,x,y);
+            check_valid(cell);
         }
     }
 }
@@ -436,7 +485,7 @@ void gridfluid_set_fluid(gridfluid_t gf, size_t x, size_t y) {
                 continue;
             gridfluid_cell_t *neigh = &GF_CELL(gf,x+dx,y+dy);
             if (neigh->flags == GF_EMPTY) {
-                gridfluid_eq(1,0.00,0.00,neigh->df);
+                gridfluid_eq(0.9,0.00,0.00,neigh->df);
                 neigh->flags = GF_INTERFACE;
                 neigh->mass = 0.9;
                 neigh->fluid = 0.9;
@@ -473,7 +522,6 @@ gridfluid_properties_t *gridfluid_get_properties(gridfluid_t gf) {
         float usqr = ux*ux + uy*uy;
         gf->props->pressure[i] = pressure;
         gf->props->mass[i] = cell->mass;
-        cell->fluid = cell->mass/pressure;
         if (pressure > max_pressure)
             max_pressure = pressure;
         if (pressure < min_pressure)
@@ -505,4 +553,5 @@ void gridfluid_step(gridfluid_t gf) {
     gf->nextgrid = tmp;
     gridfluid_collide(gf);
     gridfluid_cleanup(gf);
+    printf("lol");
 }
