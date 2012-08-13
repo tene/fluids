@@ -3,3 +3,4 @@ npraises
 *.o
 *.a
 test
+testgui
