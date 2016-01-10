@@ -16,6 +16,6 @@ executable fluids
   hs-source-dirs:      src
   main-is:             Main.hs
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5, gloss, repa
+  build-depends:       base >= 4.7 && < 5, gloss, gloss-raster, repa, vector, lens
   ghc-options:         -Odph -rtsopts -threaded -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000 -optlo-O3 -with-rtsopts=-N
   -- ghc-options:         -Odph -rtsopts -threaded -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000 -fllvm -optlo-O3 -with-rtsopts=-N
