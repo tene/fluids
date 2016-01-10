@@ -62,11 +62,11 @@ fluidSummary :: Fluid -> (Float, (Float, Float))
 fluidSummary f = Vector.foldl1' (\(p, (x,y)) (p', (x', y')) -> (p+p',(x+x'*p',y+y'*p'))) $ Vector.zip  f floatDirections
 
 renderFluid :: Fluid -> Color
-renderFluid f = rgb (p/10000) (p/10000) 1.0
+renderFluid f = rgb (p) (p) 1.0
   where p = fluidPressure f
 
 initial :: World
-initial = Repa.delay $ Repa.Vector.fromListVector (Repa.ix2 100 100) $ map (eqFluid (0,0)) [1..10000]
+initial = Repa.delay $ Repa.Vector.fromListVector (Repa.ix2 10 10) $ map (\p -> eqFluid (0,0) (p/100)) [1..100]
 
 collide :: Float -> Fluid -> Fluid
 collide v f = Vector.zipWith relax f equilibrium
@@ -80,12 +80,12 @@ viscosity = 0.2
 step :: World -> World
 step world = Repa.traverse world id stream
   where
-    stream lookup idx = collide viscosity $ Vector.map (fetchElem lookup idx) indexes
+    stream lookup idx = collide viscosity $ Vector.map (fetchElem (Repa.extent world) lookup idx) indexes
 
-fetchElem :: (DIM2 -> Fluid) -> DIM2 -> Int -> Float
-fetchElem lookup i j
-  | Vector.null source = (Vector.!) source $ (Vector.unsafeIndex) rindex j
-  | otherwise          = (Vector.!) cell $ (Vector.unsafeIndex) rindex j
+fetchElem :: DIM2 -> (DIM2 -> Fluid) -> DIM2 -> Int -> Float
+fetchElem bounds lookup i j
+  | Repa.inShape bounds sourcePos = (Vector.!) source $ (Vector.unsafeIndex) rindex j
+  | otherwise                     = (Vector.!) cell $ (Vector.unsafeIndex) rindex j
   where
     offset = (uncurry Repa.ix2) $ (Vector.unsafeIndex) directions j
     sourcePos = Repa.addDim i offset
@@ -109,5 +109,5 @@ handleInput _ w = w
 main :: IO ()
 main = do
   --GRA.animateArray (GRA.InWindow "Fluid Test" (400, 400) (10, 10)) (4,4) renderWorld
-  GRA.playArray (GRA.InWindow "Fluid Test" (400, 400) (10, 10)) (4,4) 10 initial renderField handleInput (\_ w -> w)
+  GRA.playArray (GRA.InWindow "Fluid Test" (400, 400) (10, 10)) (40,40) 10 initial renderField handleInput (\_ w -> w)
   putStrLn "hello world"
